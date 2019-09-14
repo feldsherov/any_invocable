@@ -26,7 +26,7 @@ namespace std {
     explicit any_invocable(in_place_type_t<T>, Args&&...);
     template<class T, class U, class... Args>
     explicit any_invocable(in_place_type_t<T>, initializer_list<U>, Args&&...);
-                                                    
+
     any_invocable& operator=(any_invocable&&) noexcept;
     any_invocable& operator=(nullptr_t) noexcept;
     template<class F> any_invocable& operator=(F&&);
