@@ -3,6 +3,7 @@
 #include "catch/catch.h"
 
 #include <numeric>
+#include <array>
 
 namespace {
 
