@@ -75,9 +75,11 @@ namespace any_detail {
 using buffer = std::aligned_storage_t<sizeof(void*) * 2, alignof(void*)>;
 
 template <class T>
-inline constexpr bool is_small_object_v =
+struct is_small_object {
+  static constexpr bool value =
     sizeof(T) <= sizeof(buffer) && alignof(buffer) % alignof(T) == 0 &&
-    std::is_nothrow_move_constructible_v<T>;
+    std::is_nothrow_move_constructible<T>::value;
+};
 
 union storage {
     void* ptr_ = nullptr;
@@ -122,7 +124,7 @@ struct handler_traits {
         }
 
         static R call(storage& s, ArgTypes... args) {
-            return std::invoke(*static_cast<T*>(static_cast<void*>(&s.buf_)),
+            return (*static_cast<T*>(static_cast<void*>(&s.buf_)))(
                                std::forward<ArgTypes>(args)...);
         }
     };
@@ -143,13 +145,13 @@ struct handler_traits {
         }
 
         static R call(storage& s, ArgTypes... args) {
-            return std::invoke(*static_cast<T*>(s.ptr_),
-                               std::forward<ArgTypes>(args)...);
+            return (*static_cast<T*>(s.ptr_))(
+                        std::forward<ArgTypes>(args)...);
         }
     };
 
     template <class T>
-    using handler = std::conditional_t<is_small_object_v<T>, small_handler<T>,
+    using handler = std::conditional_t<is_small_object<T>::value, small_handler<T>,
                                        large_handler<T>>;
 };
 
@@ -196,10 +198,9 @@ public:
     }
     template <
         class F, class FDec = std::decay_t<F>,
-        class = std::enable_if_t<!std::is_same_v<FDec, any_invocable> &&
-                                 !any_detail::is_in_place_type_v<FDec> &&
-                                 std::is_constructible_v<FDec, F> &&
-                                 std::is_move_constructible_v<FDec> &&
+        class = std::enable_if_t<!std::is_same<FDec, any_invocable>::value &&
+                                 std::is_constructible<FDec, F>::value &&
+                                 std::is_move_constructible<FDec>::value &&
                                  std::is_invocable_r_v<R, FDec, ArgTypes...>>>
     any_invocable(F&& f) {
         create<FDec>(std::forward<F>(f));
@@ -207,8 +208,8 @@ public:
 
     template <
         class T, class... Args, class VT = std::decay_t<T>,
-        class = std::enable_if_t<std::is_move_constructible_v<VT> &&
-                                 std::is_constructible_v<VT, Args...> &&
+        class = std::enable_if_t<std::is_move_constructible<VT>::value &&
+                                 std::is_constructible<VT, Args...>::value &&
                                  std::is_invocable_r_v<R, VT, ArgTypes...>>>
     explicit any_invocable(std::in_place_type_t<T>, Args&&... args) {
         create<VT>(std::forward<Args>(args)...);
@@ -217,8 +218,9 @@ public:
     template <
         class T, class U, class... Args, class VT = std::decay_t<T>,
         class = std::enable_if_t<
-            std::is_move_constructible_v<VT> &&
-            std::is_constructible_v<VT, std::initializer_list<U>&, Args...> &&
+            std::is_move_constructible<VT>::value &&
+            std::is_constructible<VT,
+                                  std::initializer_list<U>&, Args...>::value &&
             std::is_invocable_r_v<R, VT, ArgTypes...>>>
     explicit any_invocable(std::in_place_type_t<T>, std::initializer_list<U> il,
                            Args&&... args) {
